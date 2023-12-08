@@ -1,7 +1,7 @@
 # UserScripts
 Contains scripts to be used with Stash
 
-# SB-Frontend-Scraper.js
+# SB-Frontend-Scraper.user.js
 Map to your local Stash url and it will show up as a button in Scene pages.
 Add the Spankbang URL to your scene (in the URL field)
 Click the button
