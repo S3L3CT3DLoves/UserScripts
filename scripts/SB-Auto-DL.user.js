@@ -218,7 +218,8 @@ async function parseLinks(){
             image: data.thumbnailUrl,
             id: videoID,
             dlKey:key,
-            downloaded: allreadyDownloaded.includes(videoID)
+            downloaded: allreadyDownloaded.includes(videoID),
+            _source: "SB_AutoDLv1"
         }
         allLinks.push(video_data)
 
