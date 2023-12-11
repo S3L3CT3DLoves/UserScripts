@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=spankbang.com
 // @grant        GM_download
 // @grant        GM_addStyle
-// @require http://code.jquery.com/jquery-latest.js
 // ==/UserScript==
 
 const TAGS_SELECTOR = "#video > div.left > div.searches > a"
@@ -37,7 +36,8 @@ const MODAL_HTML = `
     <div>
         <textarea id="gmLogConsole" rows="10" cols="100"></textarea>
     </div>
-    <button id="gmCloseDlgBtn" type="button">Close popup</button> (Closing the popup does not stop the downloads)
+    <button id="gmCloseDlgBtn" type="button">Close Popup</button> (Does not stop the downloads)
+    <button id="gmClearBtn" type="button">Clear Memory</button>
   </div>
 
 </div>`
@@ -94,12 +94,38 @@ function getStoredDate(){
     return new Date(localStorage.getItem(studio_name) || '2012-01-01')
 }
 
+function setStoredDownloaded(vid_id){
+    const status = getStoredDownloaded()
+    status.push(vid_id)
+    localStorage.setItem(studio_name+"_downloads", status)
+}
+
+function getStoredDownloaded(){
+    return localStorage.getItem(studio_name+"_downloads") || []
+}
+
+function clearStorage(){
+    localStorage.removeItem(studio_name)
+    localStorage.removeItem(studio_name+"_downloads")
+}
+
 
 // Start of code
 
 async function getVideoData(url){
     return await fetch(url)
-        .then((response) => response.text())
+        .then((response) => {
+        if(!response.ok){
+            if(response.status = 429)
+            {
+                modalConsoleLog("=== Too many calls in a short time, hit the SB limit ! ===\n==== Please try again in a few minutes ====")
+            }
+            else{
+                throw Error(response.status)
+            }
+        }
+        return response.text()
+        })
         .then((response) => {
         const vid_page = parser.parseFromString (response, "text/html");
         const vid_elm = vid_page.querySelector('#video')
@@ -154,6 +180,7 @@ async function autoDL(){
                 updateProgressBar(false,0)
                 modalConsoleLog("=== " + link.title + " Download Finished ===")
                 updateStoredDate(link.date)
+                setStoredDownloaded(link.id)
             }
         })
         await currentDL
@@ -179,6 +206,7 @@ function updateStatus(text){
 
 async function parseLinks(){
     modalConsoleLog("Parsing all links in page")
+    const allreadyDownloaded = getStoredDownloaded()
     const rawLinks = document.querySelector(".data > .video-list").querySelectorAll(".video-item > .n")
     for (const link of rawLinks) {
         const [key,data,tags, vid_details] = await getVideoData(link.href)
@@ -193,7 +221,7 @@ async function parseLinks(){
             image: data.thumbnailUrl,
             id: videoID,
             dlKey:key,
-            downloaded: false
+            downloaded: allreadyDownloaded.includes(videoID)
         }
         allLinks.push(video_data)
 
@@ -203,30 +231,43 @@ async function parseLinks(){
     // Order array oldest->newest (so we can resume later if we want)
     allLinks = allLinks.sort((a,b) => new Date(a.date) > new Date(b.date) ? 1 : -1)
     // Initialise links to be all links (unfiltered)
-    links = allLinks
+    filterLinks(getStoredDate())
 }
 
 async function filterLinks(selectedDate){
     links = []
+    let allreadyDL = 0
+    let matchDate = 0
     for (const link of allLinks) {
-        if (new Date(link.date) < selectedDate) {
+        if (link.downloaded){
+            allreadyDL++
+        }
+        if (new Date(link.date) <= selectedDate) {
+            matchDate++
+        }
+        if (link.downloaded || new Date(link.date) <= selectedDate) {
             continue
         }
         links.push(link)
     }
+    modalConsoleLog("#Total Videos: " + allLinks.length)
+    modalConsoleLog("#Allready DL: " + allreadyDL)
+    modalConsoleLog("#Matching date filter: " + (links.length - matchDate))
+    modalConsoleLog("#Total to Download:" + links.length)
     updateStatus("There are " + links.length +" videos to download")
 }
 
 async function initModal(){
     document.querySelector("#startDate").addEventListener("blur", setSelectedDate)
     document.querySelector("#startDate").valueAsDate = getStoredDate()
+    document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => showModal(false))
+
 
     await parseLinks()
-    updateStatus("There are " + links.length +" videos to download")
-
     document.querySelector("#gmStartDL").disabled = false
+    document.querySelector("#gmStartDL").addEventListener('click',autoDL)
     document.querySelector("#gmStopDL").disabled = true
-    modalConsoleLog("Welcome to AutoDL - Ready !")
+    document.querySelector("#gmStopDL").addEventListener('click',stopDownloads)
 }
 
 function stopDownloads() {
@@ -250,22 +291,25 @@ function updateProgressBar(show=true, percent=0){
     progressBar.style.width = percent + "%"
 }
 
-$(document).ready(function() {
-    $('body').append('<input type="button" value="AutoDL" id="AutoDL">');
-    $("#AutoDL").css("position", "fixed").css("top", 60).css("right", 20).css("display","none");
-    $("#AutoDL").css("display","block")
-    $("body").append(MODAL_HTML)
-    $("#gmCloseDlgBtn").click ( function () {
-        $("#gmPopupContainer").hide();
-    } );
-    $("#AutoDL").click ( function () {
-        $("#gmPopupContainer").show();
-    } );
-    $('#gmStartDL').click(autoDL);
-    $('#gmStopDL').click(stopDownloads);
-    initModal()
-});
+function showModal(show){
+    document.querySelector("#gmPopupContainer").style.display = show ? 'block' : 'none'
+}
 
+function createButton(){
+    const b = document.createElement('input');
+    b.setAttribute('style','position:fixed; top:60px; right:20px; display:block');
+    b.setAttribute('id','AutoDL');
+    b.setAttribute('type','button');
+    b.value = "AutoDL"
+    b.addEventListener('click',() => showModal(true))
+    document.body.append(b)
+}
+
+function main(){
+    document.body.innerHTML += MODAL_HTML
+    initModal()
+    createButton()
+}
 
 //--- CSS for the modal
 GM_addStyle ( `
@@ -302,3 +346,5 @@ GM_addStyle ( `
        background-color: #04AA6D;
     }
 `);
+
+main()
