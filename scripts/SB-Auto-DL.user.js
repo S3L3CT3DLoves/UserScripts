@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
@@ -46,11 +46,9 @@ var parser = new DOMParser ();
 var links = [];
 var allLinks = [];
 var prevConsole = "";
+var currentDLPromise;
 var currentDL;
 const studio_name = window.location.pathname.split('/')[2]
-
-
-// Helper Functions
 
 function delay(milliseconds){
     return new Promise(resolve => {
@@ -72,14 +70,33 @@ function downloadText(text, fileType, fileName) {
   setTimeout(function() { URL.revokeObjectURL(a.href); }, 1500);
 }
 
-function Download(url, name, opt={}) {
+function Download(link, url, opt={}) {
 	Object.assign(opt, { url, name })
 
 	return new Promise((resolve, reject) => {
-		opt.onerror = reject
-		opt.onload = resolve
+        opt.url = url
+        opt.name = link.id + " - " + link.title + ".mp4"
+		opt.onerror = function (e) {
+            console.log(e)
+            reject()
+        }
+        opt.onload = function () {
+            link.downloaded = true
+            updateProgressBar(false,0)
+            modalConsoleLog("=== " + link.title + " Download Finished ===")
+            updateStoredDate(link.date)
+            setStoredDownloaded(link.id)
+            resolve()
+        }
+        opt.onprogress = function (p) {
+                let percent = Math.round((p.loaded/p.total)*100)
+                updateProgressBar(true, percent)
+                if( percent %10 == 0 ){
+                    modalConsoleLog(link.title + " - Progress: " + percent + "%")
+                }
+            }
 
-		GM_download(opt)
+		currentDL = GM_download(opt)
 	})
 }
 
@@ -97,20 +114,17 @@ function getStoredDate(){
 function setStoredDownloaded(vid_id){
     const status = getStoredDownloaded()
     status.push(vid_id)
-    localStorage.setItem(studio_name+"_downloads", status)
+    localStorage.setItem(studio_name+"_downloads", JSON.stringify(status))
 }
 
 function getStoredDownloaded(){
-    return localStorage.getItem(studio_name+"_downloads") || []
+    return JSON.parse(localStorage.getItem(studio_name+"_downloads") || '[]')
 }
 
 function clearStorage(){
     localStorage.removeItem(studio_name)
     localStorage.removeItem(studio_name+"_downloads")
 }
-
-
-// Start of code
 
 async function getVideoData(url){
     return await fetch(url)
@@ -163,27 +177,10 @@ async function autoDL(){
         // Now download the video
         const dl_link = await getDownloadURL(link.dlKey)
         updateProgressBar(true,0)
-        currentDL = GM_download({
-            url : dl_link,
-            name: link.id + " - " + link.title + ".mp4",
-            conflictAction : "prompt",
-            onprogress : function (p) {
-                let percent = Math.round((p.loaded/p.total)*100)
-                updateProgressBar(true, percent)
-                if( percent %10 == 0 ){
-                    modalConsoleLog(link.title + " - Progress: " + percent + "%")
-                }
-            },
-            onerror: function (e) { console.log(e) },
-            onload: function () {
-                link.downloaded = true
-                updateProgressBar(false,0)
-                modalConsoleLog("=== " + link.title + " Download Finished ===")
-                updateStoredDate(link.date)
-                setStoredDownloaded(link.id)
-            }
+        currentDLPromise = Download(link, dl_link, {
+            conflictAction : "prompt"
         })
-        await currentDL
+        await currentDLPromise
     }
     document.querySelector("#gmStartDL").disabled = false
     document.querySelector("#gmStopDL").disabled = true
@@ -236,13 +233,13 @@ async function parseLinks(){
 
 async function filterLinks(selectedDate){
     links = []
-    let allreadyDL = 0
+    let alreadyDL = 0
     let matchDate = 0
     for (const link of allLinks) {
         if (link.downloaded){
-            allreadyDL++
+            alreadyDL++
         }
-        if (new Date(link.date) <= selectedDate) {
+        if (new Date(link.date) > selectedDate) {
             matchDate++
         }
         if (link.downloaded || new Date(link.date) <= selectedDate) {
@@ -250,9 +247,10 @@ async function filterLinks(selectedDate){
         }
         links.push(link)
     }
+    modalConsoleLog("###############")
     modalConsoleLog("#Total Videos: " + allLinks.length)
-    modalConsoleLog("#Allready DL: " + allreadyDL)
-    modalConsoleLog("#Matching date filter: " + (links.length - matchDate))
+    modalConsoleLog("#Already DL: " + alreadyDL)
+    modalConsoleLog("#Matching date filter: " + matchDate)
     modalConsoleLog("#Total to Download:" + links.length)
     updateStatus("There are " + links.length +" videos to download")
 }
@@ -261,9 +259,6 @@ async function initModal(){
     document.querySelector("#startDate").addEventListener("blur", setSelectedDate)
     document.querySelector("#startDate").valueAsDate = getStoredDate()
     document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => showModal(false))
-
-
-    await parseLinks()
     document.querySelector("#gmStartDL").disabled = false
     document.querySelector("#gmStartDL").addEventListener('click',autoDL)
     document.querySelector("#gmStopDL").disabled = true
@@ -292,6 +287,10 @@ function updateProgressBar(show=true, percent=0){
 }
 
 function showModal(show){
+    // To avoid loading all links right when we open the page, delay it until the user clicks the AutoDL button
+    if(allLinks.length == 0){
+        parseLinks()
+    }
     document.querySelector("#gmPopupContainer").style.display = show ? 'block' : 'none'
 }
 
@@ -306,7 +305,9 @@ function createButton(){
 }
 
 function main(){
-    document.body.innerHTML += MODAL_HTML
+    var modal = document.createElement('div')
+    modal.innerHTML = MODAL_HTML
+    document.body.appendChild(modal)
     initModal()
     createButton()
 }
