@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
-// @namespace    http://tampermonkey.net/
-// @version      2.4
+// @namespace    https://spankbang.com/
+// @version      2.5
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=spankbang.com
 // @grant        GM_download
 // @grant        GM_addStyle
+// @require      https://raw.githubusercontent.com/S3L3CT3DLoves/UserScripts/main/scripts/StashVideoDataType.js
+// @require      https://raw.githubusercontent.com/S3L3CT3DLoves/UserScripts/main/scripts/UserScript-Helpers.js
 // ==/UserScript==
 
 const TAGS_SELECTOR = "#video > div.left > div.searches > a"
@@ -47,51 +49,31 @@ let currentDLPromise;
 let currentDL;
 const studio_name = window.location.pathname.split('/')[2]
 
-function delay(milliseconds){
-    return new Promise(resolve => {
-        setTimeout(resolve, milliseconds);
-    });
-}
-
-function downloadText(text, fileType, fileName) {
-  let blob = new Blob([text], { type: fileType });
-
-  let a = document.createElement('a');
-  a.download = fileName;
-  a.href = URL.createObjectURL(blob);
-  a.dataset.downloadurl = [fileType, a.download, a.href].join(':');
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1500);
-}
-
-function Download(link, url, opt={}) {
+function Download(video=VideoData(), url, opt={}, logger = modalConsoleLog) {
 	Object.assign(opt, { url, name })
 
 	return new Promise((resolve, reject) => {
         opt.url = url
-        opt.name = link.id + " - " + link.title + ".mp4"
+        opt.name = video.toFileName(false,true,true,".mp4")
 		opt.onerror = function (e) {
             console.log(e)
-            modalConsoleLog("!!! Download Error - Stopping Downloads !!!")
+            logger("!!! Download Error - Stopping Downloads !!!")
             stopDownloads()
             reject()
         }
         opt.onload = function () {
-            link.downloaded = true
+            video.downloaded = true
             updateProgressBar(false,0)
-            modalConsoleLog("=== " + link.title + " Download Finished ===")
-            updateStoredDate(link.date)
-            setStoredDownloaded(link.id)
+            logger("=== " + video.title + " Download Finished ===")
+            updateStoredDate(video.date)
+            setStoredDownloaded(video.id)
             resolve()
         }
         opt.onprogress = function (p) {
                 let percent = Math.round((p.loaded/p.total)*100)
                 updateProgressBar(true, percent)
                 if( percent %10 == 0 ){
-                    modalConsoleLog(link.title + " - Progress: " + percent + "%")
+                    logger(video.title + " - Progress: " + percent + "%")
                 }
             }
 
@@ -169,7 +151,7 @@ async function autoDL(){
         if (link.downloaded){
             continue
         }
-        modalConsoleLog("=== Starting Download (" + (i+1) + " of " + links.length + ") : " + link.title + " ===")
+        modalConsoleLog("=== Starting Download (" + (i+1) + " of " + (links.length+1) + ") : " + link.title + " ===")
         downloadText(JSON.stringify(link),'json',link.id + " - " + link.title + ".json")
 
         // Now download the video
@@ -250,7 +232,7 @@ async function filterLinks(selectedDate){
     modalConsoleLog("#Total Videos: " + allLinks.length)
     modalConsoleLog("#Already DL: " + alreadyDL)
     modalConsoleLog("#Matching date filter: " + matchDate)
-    modalConsoleLog("#Total to Download:" + links.length)
+    modalConsoleLog("#Total to Download: " + links.length)
     updateStatus("There are " + links.length +" videos to download")
 }
 
