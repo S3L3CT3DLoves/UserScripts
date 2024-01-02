@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    https://spankbang.com/
-// @version      2.5
+// @version      2.6
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
@@ -49,12 +49,8 @@ let currentDLPromise;
 let currentDL;
 const studio_name = window.location.pathname.split('/')[2]
 
-function Download(video=VideoData(), url, opt={}, logger = modalConsoleLog) {
-	Object.assign(opt, { url, name })
-
+function Download(video=VideoData(), opt={}, logger = modalConsoleLog) {
 	return new Promise((resolve, reject) => {
-        opt.url = url
-        opt.name = video.toFileName(false,true,true,".mp4")
 		opt.onerror = function (e) {
             console.log(e)
             logger("!!! Download Error - Stopping Downloads !!!")
@@ -62,20 +58,20 @@ function Download(video=VideoData(), url, opt={}, logger = modalConsoleLog) {
             reject()
         }
         opt.onload = function () {
+            logger("=== " + video.title + " Download Finished ===")
             video.downloaded = true
             updateProgressBar(false,0)
-            logger("=== " + video.title + " Download Finished ===")
             updateStoredDate(video.date)
             setStoredDownloaded(video.id)
             resolve()
         }
         opt.onprogress = function (p) {
-                let percent = Math.round((p.loaded/p.total)*100)
-                updateProgressBar(true, percent)
-                if( percent %10 == 0 ){
-                    logger(video.title + " - Progress: " + percent + "%")
-                }
+            let percent = Math.round((p.loaded/p.total)*100)
+            updateProgressBar(true, percent)
+            if( percent %10 == 0 ){
+                logger(video.title + " - Progress: " + percent + "%")
             }
+        }
 
 		currentDL = GM_download(opt)
 	})
@@ -152,15 +148,17 @@ async function autoDL(){
             continue
         }
         modalConsoleLog("=== Starting Download (" + (i+1) + " of " + (links.length+1) + ") : " + link.title + " ===")
-        downloadText(JSON.stringify(link),'json',link.id + " - " + link.title + ".json")
-
         // Now download the video
         const dl_link = await getDownloadURL(link.dlKey)
+        link.dlUrl = dl_link
         updateProgressBar(true,0)
-        currentDLPromise = Download(link, dl_link, {
-            conflictAction : "prompt"
+        currentDLPromise = Download(link, {
+            conflictAction : "prompt",
+            name: link.toFileName(false,true,true,".mp4"),
+            url: link.dlUrl
         })
         await currentDLPromise
+        downloadText(JSON.stringify(link),'json',link.id + " - " + link.title + ".json")
     }
     document.querySelector("#gmStartDL").disabled = false
     document.querySelector("#gmStopDL").disabled = true
@@ -183,31 +181,30 @@ function updateStatus(text){
 
 async function parseLinks(){
     modalConsoleLog("Parsing all links in page")
-    const allreadyDownloaded = getStoredDownloaded()
+    const alreadyDownloaded = getStoredDownloaded()
     const rawLinks = document.querySelector(".data > .video-list").querySelectorAll(".video-item > .n")
     for (const link of rawLinks) {
         const [key,data,tags, vid_details] = await getVideoData(link.href)
         const videoID = link.href.split('/')[3]
-        const video_data = {
-            title: data.name,
-            date: data.uploadDate,
-            tags: tags,
-            url: link.href,
-            studio: studio_name,
-            details: vid_details,
-            image: data.thumbnailUrl,
-            id: videoID,
-            dlKey:key,
-            downloaded: allreadyDownloaded.includes(videoID),
-            _source: "SB_AutoDLv1"
-        }
-        allLinks.push(video_data)
+        const video = new VideoData({source: "SB_AutoDLv1"})
+        video.id = videoID
+        video.title = data.name
+        video.dlKey = key
+        video.tags = tags
+        video.date = new Date(data.uploadDate)
+        video.studio = studio_name
+        video.url = link.href
+        video.details = vid_details
+        video.image = data.thumbnailUrl
+        video.downloaded = alreadyDownloaded.includes(videoID)
+ 
+        allLinks.push(video)
 
         // Throttle parsing otherwise we get 429 errors
         delay(1000)
      }
     // Order array oldest->newest (so we can resume later if we want)
-    allLinks = allLinks.sort((a,b) => new Date(a.date) > new Date(b.date) ? 1 : -1)
+    allLinks = allLinks.sort((a,b) => a.date > b.date ? 1 : -1)
     // Initialise links to be all links (unfiltered)
     filterLinks(getStoredDate())
 }
@@ -220,10 +217,10 @@ async function filterLinks(selectedDate){
         if (link.downloaded){
             alreadyDL++
         }
-        if (new Date(link.date) > selectedDate) {
+        if (link.date > selectedDate) {
             matchDate++
         }
-        if (link.downloaded || new Date(link.date) <= selectedDate) {
+        if (link.downloaded || link.date <= selectedDate) {
             continue
         }
         links.push(link)
@@ -283,12 +280,55 @@ function createButton(dialog){
     document.body.append(b)
 }
 
+async function downloadOneVideo(link){
+    console.log(link)
+    const [key,data,tags, vid_details] = await getVideoData(link)
+    const video = new VideoData({source: "SB_AutoDLv1"})
+    video.id = link.split('/')[3]
+    video.title = data.name
+    video.dlKey = key
+    video.tags = tags
+    video.date = new Date(data.uploadDate)
+    video.studio = studio_name
+    video.url = link
+    video.details = vid_details
+    video.image = data.thumbnailUrl
+    console.log(video)
+
+    const dl_link = await getDownloadURL(video.dlKey)
+    currentDLPromise = Download(video,{
+        conflictAction : "prompt",
+        name: video.toFileName(false,true,true,".mp4"),
+        url: dl_link
+    }, console.log)
+    await currentDLPromise
+    downloadText(video.toString(),'json',video.toFileName(false,true,true,".json"))
+    console.log("Done")
+}
+
+async function addInlineButtons(){
+    const videoItems = document.querySelector(".data > .video-list").querySelectorAll(".video-item > div")
+    for(const videoItem of videoItems){
+        const link = videoItem.parentNode.querySelector(".n").href
+
+        const nextButton = videoItem.querySelector("span:nth-child(2)")
+        const dlButton = document.createElement("span")
+        dlButton.setAttribute('class', 'b')
+        dlButton.innerHTML = '<svg class="i_svg i_download"><use xlink:href="/static/desktop/gen/universal.master.6.1.00d54069.svg#download"></use></svg>'
+        dlButton.addEventListener('click',() => {
+            downloadOneVideo(link)
+        })
+        videoItem.insertBefore(dlButton,nextButton)
+    }
+}
+
 function main(){
     let dialog = document.createElement('dialog')
     dialog.innerHTML = MODAL_HTML
     document.body.appendChild(dialog)
     initModal(dialog)
     createButton(dialog)
+    addInlineButtons()
 }
 
 //--- CSS for the modal
