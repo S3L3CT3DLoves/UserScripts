@@ -1,5 +1,5 @@
 class VideoData{
-    constructor({title = "", date = Date(), tags = [], url = "", studio = "", details = "", image = "",id = 0, dlKey = "", downloaded = false, source = "Def_AutoDLv1"}){
+    constructor({title = "", date = Date(0), tags = [], url = "", studio = "", details = "", image = "",id = 0, dlKey = "", downloaded = false, source = "Def_AutoDLv1"}){
         this.title = title
         this.date = date
         this.tags = tags
