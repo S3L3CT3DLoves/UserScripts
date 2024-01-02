@@ -169,7 +169,7 @@ async function autoDL(){
         if (link.downloaded){
             continue
         }
-        modalConsoleLog("=== Starting Download (" + (i+1) + " of " + (links.length+1) + ") : " + link.title + " ===")
+        modalConsoleLog("=== Starting Download (" + (i+1) + " of " + links.length + ") : " + link.title + " ===")
         downloadText(JSON.stringify(link),'json',link.id + " - " + link.title + ".json")
 
         // Now download the video
