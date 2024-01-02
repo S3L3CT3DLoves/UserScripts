@@ -257,7 +257,7 @@ async function filterLinks(selectedDate){
 async function initModal(dialog){
     document.querySelector("#startDate").addEventListener("blur", setSelectedDate)
     document.querySelector("#startDate").valueAsDate = getStoredDate()
-    document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => dialog.closeModal())
+    document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => dialog.close())
     document.querySelector("#gmStartDL").disabled = false
     document.querySelector("#gmStartDL").addEventListener('click',autoDL)
     document.querySelector("#gmStopDL").disabled = true
