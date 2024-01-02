@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.4
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
@@ -16,38 +16,35 @@ const STUDIO_SELECTOR = ""
 const DETAILS_SELECTOR = "#video > div.left > div.info > section.details > div > p:nth-child(2)"
 
 const MODAL_HTML = `
-<div id="gmPopupContainer" class="modal">
-  <div class="modal-content">
+<form id="gmPopupContainer" method="dialog">
     <h2>Auto Downloader for SpankBang</h2>
-    <div>
+    <section>
         <span id="gmStatus">There are no videos to download</span>
-        <button id="gmStartDL" type="button" disabled>Start Download</button>
+        <button id="gmStartDL" type="submit" disabled>Start Download</button>
         <button id="gmStopDL" type="button" disabled>Stop Downloads</button>
-    </div>
-    <div>
+    </section>
+    <section>
         <label for="startDate">To limit the download to latest videos, select a date:</label>
         <input type="date" id="startDate" />
-    </div>
-    <div id="progressBarContainer">
+    </section>
+    <section id="progressBarContainer">
         <div id="underneathBar">
             <div id="progressBar"></div>
         </div>
-    </div>
-    <div>
+    </section>
+    <section>
         <textarea id="gmLogConsole" rows="10" cols="100"></textarea>
-    </div>
+    </section>
     <button id="gmCloseDlgBtn" type="button">Close Popup</button> (Does not stop the downloads)
     <button id="gmClearBtn" type="button">Clear Memory</button>
-  </div>
+</form>`
 
-</div>`
-
-var parser = new DOMParser ();
-var links = [];
-var allLinks = [];
-var prevConsole = "";
-var currentDLPromise;
-var currentDL;
+let parser = new DOMParser ();
+let links = [];
+let allLinks = [];
+let prevConsole = "";
+let currentDLPromise;
+let currentDL;
 const studio_name = window.location.pathname.split('/')[2]
 
 function delay(milliseconds){
@@ -57,9 +54,9 @@ function delay(milliseconds){
 }
 
 function downloadText(text, fileType, fileName) {
-  var blob = new Blob([text], { type: fileType });
+  let blob = new Blob([text], { type: fileType });
 
-  var a = document.createElement('a');
+  let a = document.createElement('a');
   a.download = fileName;
   a.href = URL.createObjectURL(blob);
   a.dataset.downloadurl = [fileType, a.download, a.href].join(':');
@@ -78,6 +75,8 @@ function Download(link, url, opt={}) {
         opt.name = link.id + " - " + link.title + ".mp4"
 		opt.onerror = function (e) {
             console.log(e)
+            modalConsoleLog("!!! Download Error - Stopping Downloads !!!")
+            stopDownloads()
             reject()
         }
         opt.onload = function () {
@@ -124,54 +123,53 @@ function getStoredDownloaded(){
 function clearStorage(){
     localStorage.removeItem(studio_name)
     localStorage.removeItem(studio_name+"_downloads")
+    for (const link of allLinks) {
+        link.downloaded = false
+    }
+    filterLinks(getStoredDate)
 }
 
 async function getVideoData(url){
-    return await fetch(url)
-        .then((response) => {
-        if(!response.ok){
-            if(response.status = 429)
+    let result = await fetch(url)
+    if (!result.ok) {
+        if(result.status = 429)
             {
-                modalConsoleLog("=== Too many calls in a short time, hit the SB limit ! ===\n==== Please try again in a few minutes ====")
+                modalConsoleLog(
+                    `=== Too many calls in a short time, hit the SB limit ! ===
+                    ==== Please try again in a few minutes ====`)
             }
             else{
-                throw Error(response.status)
+                throw Error(result.status)
             }
-        }
-        return response.text()
-        })
-        .then((response) => {
-        const vid_page = parser.parseFromString (response, "text/html");
-        const vid_elm = vid_page.querySelector('#video')
-        const json_data = JSON.parse(vid_page.querySelector(JSON_SELECTOR).textContent)
-        const tags = Array.from(vid_page.querySelectorAll(TAGS_SELECTOR)).map((tag) => tag.textContent)
-        const details = vid_page.querySelector(DETAILS_SELECTOR).textContent
-        return [vid_elm.getAttribute('data-streamkey'),json_data, tags, details]
-    })
+    }
+    let resultText = await result.text()
+    const vid_page = parser.parseFromString (resultText, "text/html");
+    const vid_elm = vid_page.querySelector('#video')
+    const json_data = JSON.parse(vid_page.querySelector(JSON_SELECTOR).textContent)
+    const tags = Array.from(vid_page.querySelectorAll(TAGS_SELECTOR)).map((tag) => tag.textContent)
+    const details = vid_page.querySelector(DETAILS_SELECTOR).textContent
+    return [vid_elm.getAttribute('data-streamkey'),json_data, tags, details]
 }
 
 async function getDownloadURL(streamkey){
     const formData = new FormData();
     formData.append("id", streamkey);
-    return await fetch('https://spankbang.com/api/download',{
-        method: 'POST',
-        body: formData
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        // list is always ordered from worst to best, grab the best
-        return data.results.pop().url
-    })
+    let result = await fetch('https://spankbang.com/api/download',{
+            method: 'POST',
+            body: formData
+        })
+    let data = await result.json()
+    return data.results.pop().url
 }
 
 async function autoDL(){
     document.querySelector("#gmStartDL").disabled = true
     document.querySelector("#gmStopDL").disabled = false
-    for (const link of links) {
+    for (const [i,link] of links.entries()) {
         if (link.downloaded){
             continue
         }
-        modalConsoleLog("=== Starting Download : " + link.title + " ===")
+        modalConsoleLog("=== Starting Download (" + (i+1) + " of " + (links.length+1) + ") : " + link.title + " ===")
         downloadText(JSON.stringify(link),'json',link.id + " - " + link.title + ".json")
 
         // Now download the video
@@ -256,14 +254,15 @@ async function filterLinks(selectedDate){
     updateStatus("There are " + links.length +" videos to download")
 }
 
-async function initModal(){
+async function initModal(dialog){
     document.querySelector("#startDate").addEventListener("blur", setSelectedDate)
     document.querySelector("#startDate").valueAsDate = getStoredDate()
-    document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => showModal(false))
+    document.querySelector("#gmCloseDlgBtn").addEventListener('click',() => dialog.closeModal())
     document.querySelector("#gmStartDL").disabled = false
     document.querySelector("#gmStartDL").addEventListener('click',autoDL)
     document.querySelector("#gmStopDL").disabled = true
     document.querySelector("#gmStopDL").addEventListener('click',stopDownloads)
+    document.querySelector("#gmClearBtn").addEventListener('click',clearStorage)
 }
 
 function stopDownloads() {
@@ -287,30 +286,27 @@ function updateProgressBar(show=true, percent=0){
     progressBar.style.width = percent + "%"
 }
 
-function showModal(show){
-    // To avoid loading all links right when we open the page, delay it until the user clicks the AutoDL button
-    if(allLinks.length == 0){
-        parseLinks()
-    }
-    document.querySelector("#gmPopupContainer").style.display = show ? 'block' : 'none'
-}
-
-function createButton(){
+function createButton(dialog){
     const b = document.createElement('input');
     b.setAttribute('style','position:fixed; top:60px; right:20px; display:block');
     b.setAttribute('id','AutoDL');
     b.setAttribute('type','button');
     b.value = "AutoDL"
-    b.addEventListener('click',() => showModal(true))
+    b.addEventListener('click',() => {
+        if(allLinks.length == 0){
+            parseLinks()
+        }
+        dialog.showModal()
+    })
     document.body.append(b)
 }
 
 function main(){
-    var modal = document.createElement('div')
-    modal.innerHTML = MODAL_HTML
-    document.body.appendChild(modal)
-    initModal()
-    createButton()
+    let dialog = document.createElement('dialog')
+    dialog.innerHTML = MODAL_HTML
+    document.body.appendChild(dialog)
+    initModal(dialog)
+    createButton(dialog)
 }
 
 //--- CSS for the modal
@@ -324,7 +320,6 @@ GM_addStyle ( `
         border:                 3px double black;
         border-radius:          1ex;
         z-index:                777;
-        display:                none;
     }
     #gmPopupContainer button{
         cursor:                 pointer;
