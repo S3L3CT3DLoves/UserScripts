@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.3
+// @version      0.4
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
@@ -157,7 +157,7 @@ async function autoDL(){
             continue
         }
         modalConsoleLog("=== Starting Download (" + (i+1) + " of " + vids.length + ") : " + vid.title + " ===")
-        downloadText(vid.toString(),vid.toFileName(true,false,true,".json"))
+        downloadText(vid.toString(),"json",vid.toFileName(true,false,true,".json"))
 
         // Now download the video
         updateProgressBar(true,0)
@@ -200,6 +200,14 @@ async function getCreatorLinks(creatorName){
     return creatorData.json()
 }
 
+function generatePMVHavenUrl(title, id){
+    cleanTitle = title.replaceAll(/\s/g, "-")
+    while(cleanTitle.includes("--")){
+        cleanTitle = cleanTitle.replaceAll("--", "-")
+    }
+    return "https://pmvhaven.com/video/" + cleanTitle + "_" + id
+}
+
 async function getAllVideos(){
     modalConsoleLog("Getting all videos")
     studio_name = window.location.pathname.split('/').pop()
@@ -214,6 +222,7 @@ async function getAllVideos(){
         video.studio = item.creator
         video.date = new Date(item.isoDate)
         video.downloaded = alreadyDownloaded.includes(item._id)
+        video.url = generatePMVHavenUrl(item.title, item._id)
         // That's all we can get, maybe add more in the future if needed to get a full JSON file
 
         allVideos.push(video)
@@ -223,6 +232,7 @@ async function getAllVideos(){
     console.log(allVideos)
     // Initialise links to be all links (unfiltered)
     filterVideos(getStoredDate())
+    print(allVideos)
 }
 
 async function filterVideos(selectedDate){
@@ -304,7 +314,12 @@ async function buttonClickSingleDL(){
     console.log(video)
     console.log(video.toFileName(true,false,true,".mp4"))
     console.log("Downloading " + video.title)
-    GM_download(videoData.url,video.toFileName(true,false,true,".mp4") )
+    
+    currentDLPromise = Download(video, videoData.url, {
+        conflictAction : "prompt"
+    })
+    await currentDLPromise
+    downloadText(video.toString(),"json",video.toFileName(true,false,true,".json"))
 }
 
 function createButton(dialog){
@@ -333,6 +348,7 @@ function main(){
     dialog.setAttribute('id','AutoDLDialog')
     dialog.innerHTML = MODAL_HTML
     document.body.appendChild(dialog)
+    studio_name = window.location.pathname.split('/').pop()
     initModal(dialog)
     createButton(dialog)
 }
