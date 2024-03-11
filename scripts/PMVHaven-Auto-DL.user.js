@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.4
+// @version      0.5
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
@@ -185,19 +185,48 @@ function updateStatus(text){
     status.innerText = text
 }
 
-async function getCreatorLinks(creatorName){
-    let creatorData = await fetch('https://pmvhaven.com/api/v2/search',{
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            "creator": creatorName,
-            "mode": "SearchCreator"
+async function getCreatorLinks(creatorName, index = 1){
+    let links = []
+    let headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+    if(index == 1){
+        let creatorData = await fetch('https://pmvhaven.com/api/v2/search',{
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                "creator": creatorName,
+                "mode": "SearchCreator"
+            })
         })
-    })
-    return creatorData.json()
+        jsonData = await creatorData.json()
+
+        links = jsonData.data
+        while(links.length < jsonData.count){
+            index = index + 1
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            let newData = await getCreatorLinks(creatorName, index)
+            links.push(...newData.data)
+
+            console.log(links.length)
+        }
+
+        return links
+    }
+    else{
+        let creatorData = await fetch('https://pmvhaven.com/api/v2/search',{
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                "creator": creatorName,
+                "mode": "SearchMoreCreator",
+                "index": index
+            })
+        })
+        return creatorData.json()
+    }
 }
 
 function generatePMVHavenUrl(title, id){
@@ -209,11 +238,11 @@ function generatePMVHavenUrl(title, id){
 }
 
 async function getAllVideos(){
-    modalConsoleLog("Getting all videos")
+    modalConsoleLog("Getting all video data")
     studio_name = window.location.pathname.split('/').pop()
     const alreadyDownloaded = getStoredDownloaded()
     let creatorData = await getCreatorLinks(studio_name)
-    creatorData = creatorData.data
+
     for (const item of creatorData) {
         let video = new VideoData({source: "PMVH_AutoDLv1"})
         video.title = item.title
@@ -232,7 +261,7 @@ async function getAllVideos(){
     console.log(allVideos)
     // Initialise links to be all links (unfiltered)
     filterVideos(getStoredDate())
-    print(allVideos)
+    console.log(allVideos)
 }
 
 async function filterVideos(selectedDate){
