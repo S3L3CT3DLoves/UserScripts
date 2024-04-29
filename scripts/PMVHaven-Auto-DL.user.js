@@ -353,7 +353,7 @@ async function buttonClickSingleDL(){
 
 function createButton(dialog){
     const b = document.createElement('input');
-    b.setAttribute('style','position:fixed; top:60px; right:20px;z-index: 100; display:block');
+    b.setAttribute('style','position:fixed; top:60px; right:20px;z-index: 1000; display:block');
     b.setAttribute('id','AutoDL');
     b.setAttribute('type','button');
     b.value = "AutoDL"
