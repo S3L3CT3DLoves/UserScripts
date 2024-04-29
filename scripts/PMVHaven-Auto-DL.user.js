@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.5
+// @version      0.5.1
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
