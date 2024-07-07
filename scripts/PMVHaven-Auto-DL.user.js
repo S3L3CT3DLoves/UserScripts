@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.5.1
+// @version      0.6
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
@@ -16,7 +16,7 @@ const patternVideo = new URLPattern({ pathname: '/video/*' });
 const patternProfile = new URLPattern({ pathname: '/profile/*' });
 const patternCreator = new URLPattern({ pathname: '/creator/*' });
 
-const MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
+let MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
 
 const MODAL_HTML = `
 <form id="gmPopupContainer" method="dialog">
@@ -150,9 +150,15 @@ async function getVideoData(videoID){
 }
 
 async function autoDL(){
+    if (vids.length == 0){
+        modalConsoleLog("=== Nothing To Download ===")
+        return
+    }
+
     document.querySelector("#gmStartDL").disabled = true
     document.querySelector("#gmStopDL").disabled = false
     for (const [i,vid] of vids.entries()) {
+        console.log(vid);
         if (vid.downloaded){
             continue
         }
@@ -329,7 +335,6 @@ function buttonClickList(){
 
 async function buttonClickSingleDL(){
     const videoID = window.location.pathname.split('_').pop()
-    console.log(videoID)
     let videoData = await getVideoData(videoID)
     videoData = videoData.pop()
     studio_name = videoData.creator
@@ -340,8 +345,14 @@ async function buttonClickSingleDL(){
     video.studio = studio_name
     video.url = window.location.href
     video.id = videoID
-    console.log(video)
-    console.log(video.toFileName(true,false,true,".mp4"))
+
+    let downloadedVideos = getStoredDownloaded()
+    if (downloadedVideos && downloadedVideos.length > 0 && downloadedVideos.includes(videoID)){
+        if (!confirm("This video has already been downloaded. Download Anyways ?")){
+            return
+        }
+    }
+    
     console.log("Downloading " + video.title)
     
     currentDLPromise = Download(video, videoData.url, {
@@ -359,6 +370,7 @@ function createButton(dialog){
     b.value = "AutoDL"
     document.body.append(b)
     b.addEventListener('click',() => {
+        MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
         if (MODE == "CREATOR"){
             // Profile mode will be added later, it messes with the saving of already-dl files
             buttonClickList()
