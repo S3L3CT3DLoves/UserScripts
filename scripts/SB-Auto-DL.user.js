@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    https://spankbang.com/
-// @version      2.6
+// @version      2.7
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
