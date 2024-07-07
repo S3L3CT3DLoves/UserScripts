@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang Frontend Scraper
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      1.0
 // @description  Use in Stash to scrape Spankbang from the browser, bypassing cloudflare issues
 // @author       S3LECT3D
 // @match        http://localhost:9997/scenes/*
@@ -9,9 +9,9 @@
 // @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
-const JSON_SELECTOR = "#container > script[type='application/ld+json']"
-const STUDIO_SELECTOR = "#video > div.left > ul > li.us > a"
-const DETAILS_SELECTOR = "#video > div.left > div.info > section.details > div > p:nth-child(2)"
+const JSON_SELECTOR = "main > script[type='application/ld+json']"
+const STUDIO_SELECTOR = "#video > div.left.space-y-0\\.5 > ul > li.primary_actions_container > a > span"
+const DETAILS_SELECTOR = "#video > div.left.space-y-0\\.5 > div.info > section.details > div > div"
 
 var parser = new DOMParser ();
 
@@ -33,7 +33,7 @@ function setNativeValue(element, value) {
 };
 
 function setImage(url){
-    const imageSelectButton = document.querySelector("label[for='cover'] ~ button")
+    const imageSelectButton = document.querySelector("label[for='cover_image'] ~ button")
     imageSelectButton.click()
     const imageSelectURL = document.querySelector("#set-image-popover > div.popover-body > div > button")
     imageSelectURL.click()
@@ -59,6 +59,7 @@ async function parseLink(){
         url: link,
         onload: function(response){
             const vid_page = parser.parseFromString (response.responseText, "text/html")
+            console.log(vid_page)
             const json_data = JSON.parse(vid_page.querySelector(JSON_SELECTOR).textContent)
             const studio = vid_page.querySelector(STUDIO_SELECTOR).textContent
             setNativeValue(titleInput, json_data.name)
@@ -82,7 +83,7 @@ function createButton(){
 }
 
 function focusEditTab(){
-    const editTab = document.querySelector("div[role='tablist'] > div:nth-child(6) > a")
+    const editTab = document.querySelector("div[role='tablist'] > div:nth-child(8) > a")
     editTab.click()
 }
 
