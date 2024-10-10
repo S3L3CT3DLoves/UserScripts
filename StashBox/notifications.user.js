@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         StashBox Notifications
 // @namespace    https://stashdb.org/
-// @version      0.3
+// @version      0.3.1
 // @description  Notifications for StashBox !
 // @author       You
 // @match        https://stashdb.org/*
@@ -103,7 +103,7 @@ async function getOtherUsersOpenEdits(){
       "status" : "PENDING"
   }
 
-  let result = await fetch('https://pmvstash.org/graphql', {
+  let result = await fetch(window.location.origin + '/graphql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -129,7 +129,7 @@ async function getUserOpenEdits(userId){
         "status" : "PENDING"
     }
 
-    let result = await fetch('https://pmvstash.org/graphql', {
+    let result = await fetch(window.location.origin + '/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ async function getCurrentUserId(){
     }
     `
 
-    let result = await fetch('https://pmvstash.org/graphql', {
+    let result = await fetch(window.location.origin + '/graphql', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
