@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         StashBox Notifications
 // @namespace    https://stashdb.org/
-// @version      0.3.1
+// @version      0.4
 // @description  Notifications for StashBox !
 // @author       You
 // @match        https://stashdb.org/*
@@ -80,6 +80,23 @@ NOTIFICATION_UI_HTML = `<div id="notificationContainer" method="dialog">
     <button class="btn btn-secondary-outline" id="notifMarkAllRead" type="button">Mark all as read</button>
 </div>`
 
+async function callGQL(url, gqlQuery, queryVariables){
+  let result = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: gqlQuery,
+      variables: {
+        input: queryVariables
+      },
+    }),
+  })
+  let resultJson = await result.json()
+  return resultJson["data"]
+}
+
 function toggleNotificationList(){
     if(notificationMenuContainer.style.display == 'block'){
         notificationMenuContainer.style.display = 'none'
@@ -103,21 +120,15 @@ async function getOtherUsersOpenEdits(){
       "status" : "PENDING"
   }
 
-  let result = await fetch(window.location.origin + '/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: GET_OPEN_USER_EDITS,
-        variables: {
-          input: gqlInput,
-        },
-      }),
-    })
-  
-  let resultJson = await result.json()
-  return resultJson["data"]["queryEdits"]
+  let openEdits = await callGQL(window.location.origin + '/graphql', GET_OPEN_USER_EDITS, gqlInput).then(result => result["queryEdits"])
+  if(openEdits["count"] > 100){
+    for(let page = 2; page <= Math.ceil(openEdits["count"]/100); page++){
+      gqlInput["page"] = page
+      let nextPageEdits = await callGQL(window.location.origin + '/graphql', GET_OPEN_USER_EDITS, gqlInput).then(result => result["queryEdits"]["edits"])
+      openEdits["edits"].push(...nextPageEdits)
+    }
+  }
+  return openEdits["edits"]
 }
 
 async function getUserOpenEdits(userId){
@@ -128,22 +139,15 @@ async function getUserOpenEdits(userId){
         "user_id" : userId,
         "status" : "PENDING"
     }
-
-    let result = await fetch(window.location.origin + '/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: GET_OPEN_USER_EDITS,
-          variables: {
-            input: gqlInput,
-          },
-        }),
-      })
-    
-    let resultJson = await result.json()
-    return resultJson["data"]["queryEdits"]
+    let userOpenEdits = await callGQL(window.location.origin + '/graphql', GET_OPEN_USER_EDITS, gqlInput).then(result => result["queryEdits"])
+    if(userOpenEdits["count"] > 100){
+      for(let page = 2; page <= Math.ceil(userOpenEdits["count"]/100); page++){
+        gqlInput["page"] = page
+        let nextPageEdits = await callGQL(window.location.origin + '/graphql', GET_OPEN_USER_EDITS, gqlInput).then(result => result["queryEdits"]["edits"])
+        userOpenEdits["edits"].push(...nextPageEdits)
+      }
+    }
+    return userOpenEdits["edits"]
 }
 
 async function getCurrentUserId(){
@@ -291,7 +295,7 @@ async function main(){
     let currentUserId = await getCurrentUserId()
 
     let userEdits = await getUserOpenEdits(currentUserId)
-    let filteredEdits = userEdits["edits"].filter((edit) => {
+    let filteredEdits = userEdits.filter((edit) => {
       if(edit["comments"] && edit["comments"].length > 1){
         let counter = edit["comments"].filter(comment => comment["user"]["id"] != currentUserId).length
         if(counter > 0){
@@ -304,7 +308,7 @@ async function main(){
     filteredEdits.forEach((edit) => addNotification(edit, "MYEDITS"))
 
     let otherUserEdits = await getOtherUsersOpenEdits()
-    let filteredOtherUserEdits = otherUserEdits["edits"].filter((edit) => {
+    let filteredOtherUserEdits = otherUserEdits.filter((edit) => {
       if(edit["comments"] && edit["comments"].length > 1){
         let counter = edit["comments"].filter(comment => comment["user"]["id"] == currentUserId).length
         if(counter > 0){
