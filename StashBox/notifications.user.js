@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         StashBox Notifications
 // @namespace    https://stashdb.org/
-// @version      0.4
+// @version      0.4.1
 // @description  Notifications for StashBox !
 // @author       You
 // @match        https://stashdb.org/*
@@ -197,7 +197,7 @@ function getReadNotifications(){
 
 function setupUI(){
     notificationMenuItem = document.createElement('a')
-    notificationMenuItem.classList.add("nav-link","ms-auto","me-4")
+    notificationMenuItem.classList.add("nav-link","ms-auto","me-4", "text-muted")
     notificationMenuItem.onclick = toggleNotificationList
 
     let menuBarContainer = document.getElementsByClassName("align-items-center navbar-nav")[0]
@@ -218,6 +218,7 @@ function refreshUI(){
     const menuTitle = "Notifications"
     const notificationDisplayList = notificationMenuContainer.childNodes[1].childNodes[1]
     notificationDisplayList.innerHTML = ""
+    notificationMenuItem.classList.remove("text-muted")
 
     if(notificationCounter > 0){
         notificationMenuItem.innerHTML = menuTitle + " <span class='badge text-bg-warning'>" + notificationCounter + "</span>"
