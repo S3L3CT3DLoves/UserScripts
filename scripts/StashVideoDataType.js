@@ -1,3 +1,4 @@
+/** Class representing the metadata of a Video, provides a standard type for scraping into Stash */
 class VideoData{
     constructor({title = "", date = Date(0), tags = [], performers = [], url = "", studio = "", details = "", image = "",id = 0, dlKey = "", dlUrl = "", downloaded = false, source = "Def_AutoDLv1.1"}){
         this.title = title
@@ -19,6 +20,14 @@ class VideoData{
         return JSON.stringify(this)
     }
 
+    /**
+     * 
+     * @param {boolean} studio - Includes studio in filename if true
+     * @param {boolean} id - Includes id in filename if true
+     * @param {boolean} title - Includes title in filename if true
+     * @param {string} type - File extension
+     * @returns {string} - Filename based on the video's data
+     */
     toFileName(studio = true, id = true, title = true, type = ".mp4"){
          let elements = []
          if(studio){
