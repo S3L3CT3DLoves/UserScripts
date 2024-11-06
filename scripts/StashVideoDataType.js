@@ -1,6 +1,6 @@
 /** Class representing the metadata of a Video, provides a standard type for scraping into Stash */
 class VideoData{
-    constructor({title = "", date = Date(0), tags = [], performers = [], url = "", studio = "", details = "", image = "",id = 0, dlKey = "", dlUrl = "", downloaded = false, source = "Def_AutoDLv1.1"}){
+    constructor({title = "", date = Date(0), tags = [], performers = [], url = "", studio = "", details = "", image = "",id = 0, dlKey = "", dlUrl = "", downloaded = false, counter = 0, source = "Def_AutoDLv1.2"}){
         this.title = title
         this.date = date
         this.tags = tags
@@ -13,6 +13,7 @@ class VideoData{
         this.dlUrl = dlUrl
         this.downloaded = downloaded
         this.performers = performers
+        this.counter = counter
         this._source = source
     }
 
@@ -28,7 +29,7 @@ class VideoData{
      * @param {string} type - File extension
      * @returns {string} - Filename based on the video's data
      */
-    toFileName(studio = true, id = true, title = true, type = ".mp4"){
+    toFileName(studio = true, id = true, title = true, type = ".mp4", counter = false){
          let elements = []
          if(studio){
             elements.push(this.studio)
@@ -39,6 +40,9 @@ class VideoData{
          if(title){
             elements.push(this.title)
          }
+        if(counter && this.counter > 0){
+            elements.push(this.counter)
+        }
         let filename = elements.join(' - ') + type
         filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
         return filename
