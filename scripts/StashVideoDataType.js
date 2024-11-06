@@ -39,6 +39,8 @@ class VideoData{
          if(title){
             elements.push(this.title)
          }
-         return elements.join(' - ') + type
+        let filename = elements.join(' - ') + type
+        filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+        return filename
     }
 }
