@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SpankBang AutoDL
 // @namespace    https://spankbang.com/
-// @version      2.7
+// @version      2.8
 // @description  Dashboard to download all a user's videos on SpankBang
 // @author       S3L3CT3D
 // @match        https://spankbang.com/profile/*/videos
@@ -12,10 +12,10 @@
 // @require      https://raw.githubusercontent.com/S3L3CT3DLoves/UserScripts/main/scripts/UserScript-Helpers.js
 // ==/UserScript==
 
-const TAGS_SELECTOR = "#video > div.left > div.searches > a"
-const JSON_SELECTOR = "#container > script[type='application/ld+json']"
+const TAGS_SELECTOR = "#video  > .left > div > .searches > a"
+const JSON_SELECTOR = "main > script[type='application/ld+json']"
 const STUDIO_SELECTOR = ""
-const DETAILS_SELECTOR = "#video > div.left > div.info > section.details > div > p:nth-child(2)"
+const DETAILS_SELECTOR = "section.details > div > div > p:nth-child(2)"
 
 const MODAL_HTML = `
 <form id="gmPopupContainer" method="dialog">
@@ -125,7 +125,11 @@ async function getVideoData(url){
     const vid_elm = vid_page.querySelector('#video')
     const json_data = JSON.parse(vid_page.querySelector(JSON_SELECTOR).textContent)
     const tags = Array.from(vid_page.querySelectorAll(TAGS_SELECTOR)).map((tag) => tag.textContent)
-    const details = vid_page.querySelector(DETAILS_SELECTOR).textContent
+    const detailsElmt = vid_page.querySelector(DETAILS_SELECTOR)
+    let details = ""
+    if (detailsElmt){
+        details = detailsElmt.textContent
+    }
     return [vid_elm.getAttribute('data-streamkey'),json_data, tags, details]
 }
 
@@ -309,16 +313,17 @@ async function downloadOneVideo(link){
 async function addInlineButtons(){
     const videoItems = document.querySelector(".data > .video-list").querySelectorAll(".video-item > div")
     for(const videoItem of videoItems){
-        const link = videoItem.parentNode.querySelector(".n").href
+        const link = videoItem.parentNode.querySelector(".name > a").href
 
-        const nextButton = videoItem.querySelector("span:nth-child(2)")
+        const nextButton = videoItem.querySelector(".data > .video-list > .video-item > div  > .uploader-and-stats-wrapper > .b > svg")
         const dlButton = document.createElement("span")
         dlButton.setAttribute('class', 'b')
+        dlButton.classList.add('i_svg')
         dlButton.innerHTML = '<svg class="i_svg i_download"><use xlink:href="/static/desktop/gen/universal.master.6.1.00d54069.svg#download"></use></svg>'
         dlButton.addEventListener('click',() => {
             downloadOneVideo(link)
         })
-        videoItem.insertBefore(dlButton,nextButton)
+        videoItem.querySelector(".data > .video-list > .video-item > div  > .uploader-and-stats-wrapper > .b").insertBefore(dlButton,nextButton)
     }
 }
 
