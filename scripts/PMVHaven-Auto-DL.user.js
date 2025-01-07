@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.6
+// @version      0.7
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
 // @match        https://pmvhaven.com/creator/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=spankbang.com
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=pmvhaven.com
 // @grant        GM_download
 // @grant        GM_addStyle
 // @require      https://raw.githubusercontent.com/S3L3CT3DLoves/UserScripts/main/scripts/StashVideoDataType.js
@@ -15,8 +15,6 @@
 const patternVideo = new URLPattern({ pathname: '/video/*' });
 const patternProfile = new URLPattern({ pathname: '/profile/*' });
 const patternCreator = new URLPattern({ pathname: '/creator/*' });
-
-let MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
 
 const MODAL_HTML = `
 <form id="gmPopupContainer" method="dialog">
@@ -75,7 +73,7 @@ function Download(video=VideoData(), url, opt={}, logger = modalConsoleLog) {
 
 	return new Promise((resolve, reject) => {
         opt.url = url
-        opt.name = video.toFileName(true,false,true,".mp4")
+        opt.name = video.toFileName(true,true,true,".mp4")
 		opt.onerror = function (e) {
             console.log(e)
             logger("!!! Download Error - Stopping Downloads !!!")
@@ -146,6 +144,7 @@ async function getVideoData(videoID){
         })
     })
     let data = await result.json()
+    console.log(result)
     return data.video
 }
 
@@ -354,12 +353,13 @@ async function buttonClickSingleDL(){
     }
     
     console.log("Downloading " + video.title)
+    console.log(video)
     
     currentDLPromise = Download(video, videoData.url, {
         conflictAction : "prompt"
     })
     await currentDLPromise
-    downloadText(video.toString(),"json",video.toFileName(true,false,true,".json"))
+    downloadText(video.toString(),"json",video.toFileName(true,true,true,".json"))
 }
 
 function createButton(dialog){
@@ -370,7 +370,7 @@ function createButton(dialog){
     b.value = "AutoDL"
     document.body.append(b)
     b.addEventListener('click',() => {
-        MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
+        let MODE = patternVideo.test(window.location.href) ? "VIDEO" : patternProfile.test(window.location.href) ? "PROFILE" : patternCreator.test(window.location.href) ? "CREATOR" : "ERROR"
         if (MODE == "CREATOR"){
             // Profile mode will be added later, it messes with the saving of already-dl files
             buttonClickList()
@@ -385,6 +385,7 @@ function createButton(dialog){
 }
 
 function main(){
+    console.log("Run")
     let dialog = document.createElement('dialog')
     dialog.setAttribute('id','AutoDLDialog')
     dialog.innerHTML = MODAL_HTML
