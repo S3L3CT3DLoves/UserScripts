@@ -1,11 +1,9 @@
 // ==UserScript==
 // @name         StashBox Notifications
 // @namespace    https://stashdb.org/
-// @version      0.4.1
+// @version      0.5
 // @description  Notifications for StashBox !
 // @author       You
-// @match        https://stashdb.org/*
-// @match        https://pmvstash.org/*
 // @match        https://fansdb.cc/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=stashdb.org
 // @grant        GM_addStyle
