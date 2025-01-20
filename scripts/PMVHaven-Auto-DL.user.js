@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PMVHaven AutoDL
 // @namespace    https://pmvhaven.com/
-// @version      0.7
+// @version      0.7.1
 // @description  Dashboard to simplify PMV downloading on PMVHaven
 // @author       S3L3CT3D
 // @match        https://pmvhaven.com/video/*
@@ -162,7 +162,7 @@ async function autoDL(){
             continue
         }
         modalConsoleLog("=== Starting Download (" + (i+1) + " of " + vids.length + ") : " + vid.title + " ===")
-        downloadText(vid.toString(),"json",vid.toFileName(true,false,true,".json"))
+        downloadText(vid.toString(),"json",vid.toFileName(true,true,true,".json"))
 
         // Now download the video
         updateProgressBar(true,0)
