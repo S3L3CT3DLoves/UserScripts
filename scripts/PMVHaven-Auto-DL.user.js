@@ -312,6 +312,7 @@ async function buttonClickSingleDL(){
     video.studio = studio_name
     video.url = window.location.href
     video.id = videoID
+    video.rawData = videoData
 
     let downloadedVideos = getStoredDownloaded()
     if (downloadedVideos && downloadedVideos.length > 0 && downloadedVideos.includes(videoID)){
